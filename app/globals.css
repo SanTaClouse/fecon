@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: #faf6ee; /* blanco cálido */
+  color: #2c2924; /* texto */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Entrada fade-up. El contenido es SIEMPRE visible: el keyframe solo lo
+   levanta/desvanece una vez al montar. Con prefers-reduced-motion se desactiva
+   y el contenido queda visible sin animación. */
+.reveal {
+  animation: fecon-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+.text-balance {
+  text-wrap: balance;
+}
