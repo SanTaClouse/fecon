@@ -6,7 +6,7 @@ const cards = [
   {
     n: "01",
     t: "Construcción llave en mano",
-    d: "De terreno a llaves. Nos hacemos cargo de todo el proceso para que no tengas que ser tu propio capataz.",
+    d: "Nos hacemos cargo de todo el proceso de construcción.",
     href: WA.construccion,
   },
   {
@@ -85,8 +85,7 @@ export function Servicios() {
                 Techos de tejas
               </h3>
               <p className="mb-[18px] mt-[12px] max-w-[280px] font-sans text-[15px] leading-[1.5] text-blanco/[0.78]">
-                Reparación, recambio total e impermeabilización. Pocos lo hacen
-                bien en Santa Fe; nosotros vivimos de esto hace años.
+                Reparación, recambio total e impermeabilización.
               </p>
               <span className="inline-flex items-center gap-[7px] font-sans text-[14.5px] font-bold text-bronce-light">
                 Consultar por mi techo <ArrowRight />

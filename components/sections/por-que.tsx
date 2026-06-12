@@ -5,12 +5,12 @@ const items = [
   {
     Icon: IconEquipo,
     t: "Equipo propio",
-    d: "15 personas en relación de dependencia. No tercerizamos: la obra la hace nuestra gente, no un subcontratista que aparece y desaparece.",
+    d: "Un equipo de mas de 15 profesionales. Arquitecto, albañil, cloaquista, plomero, gasista, durlero, yesero, electricista. No tercerizamos: la obra la hace nuestra gente, no un subcontratista que aparece y desaparece.",
   },
   {
     Icon: IconTrato,
     t: "Trato directo con el dueño",
-    d: "Hablás con Martín, no con un vendedor ni un arquitecto intermediario que infle la cuenta. Las cosas se dicen de frente.",
+    d: "Hablás con Martín, no con un vendedor ni un arquitecto intermediario que infle la cuenta.",
   },
   {
     Icon: IconTecho,

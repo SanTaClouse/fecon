@@ -19,7 +19,7 @@ const qs: [string, string][] = [
   ],
   [
     "¿Necesito tener los planos o un arquitecto?",
-    "No. Si hace falta un profesional puntual lo coordinamos, pero el grueso lo manejamos directo con vos para que no pagues comisiones de más.",
+    "No. Contamos con un equipo completo de profesionales para que no pagues comisiones de más.",
   ],
   [
     "¿En qué zona trabajan?",
@@ -27,11 +27,7 @@ const qs: [string, string][] = [
   ],
   [
     "¿Cuánto tarda una casa de cero?",
-    "Depende del tamaño, pero una vivienda familiar suele estar entre 8 y 12 meses. Te damos un cronograma realista desde el arranque.",
-  ],
-  [
-    "¿Por qué techos de tejas y no otro techo?",
-    "Bien hecho, un techo de tejas dura décadas y aísla mejor. El problema es que pocos lo ejecutan bien: ahí entramos nosotros.",
+    "Depende del tamaño, pero una vivienda familiar suele estar entre 6 y 10 meses. Te damos un cronograma realista desde el arranque.",
   ],
 ];
 

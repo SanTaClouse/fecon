@@ -18,8 +18,7 @@ export function CTA() {
         </Reveal>
         <Reveal delay={130}>
           <p className="mb-[28px] mt-[18px] max-w-[320px] font-sans text-[17px] leading-[1.5] text-blanco/[0.8]">
-            Mandanos un WhatsApp y te respondemos nosotros mismos —no un bot— con
-            las preguntas justas para darte un número real.
+            Mandanos un WhatsApp y te respondemos nosotros mismos. Contacto directo con el dueño
           </p>
         </Reveal>
         <Reveal delay={200}>
