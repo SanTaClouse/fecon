@@ -6,9 +6,13 @@ import { useEffect, useRef, useState } from "react";
 // autoplay sin audio, así que arranca silenciado en loop y el visitante activa
 // el sonido con el botón si quiere. Las rayas quedan de fallback mientras carga.
 //
-// ⚠ Reemplazar por el link directo al archivo .mp4, o copiar el video a
-//   /public/videos/hero.mp4 (un link de Instagram no sirve como src directo).
-const VIDEO_SRC = "/videos/hero.mp4";
+// Servido desde Cloudinary: la extensión .mp4 (el original es .mov) y q_auto
+// hacen que Cloudinary transcodifique a H.264 comprimido; so_0 saca el primer
+// frame como poster para que haya imagen mientras descarga el video.
+const VIDEO_SRC =
+  "https://res.cloudinary.com/dlw9ocu3b/video/upload/q_auto/v1781288284/IMG_7466_cxsb98.mp4";
+const POSTER_SRC =
+  "https://res.cloudinary.com/dlw9ocu3b/video/upload/so_0,q_auto/v1781288284/IMG_7466_cxsb98.jpg";
 
 export function HeroVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -46,6 +50,7 @@ export function HeroVideo() {
         ref={videoRef}
         className="absolute inset-0 h-full w-full object-cover object-center"
         src={VIDEO_SRC}
+        poster={POSTER_SRC}
         autoPlay
         muted
         loop
