@@ -1,33 +1,11 @@
 import { Reveal, Eyebrow, WAButton } from "@/components/ui-bits";
+import { HeroVideo } from "@/components/sections/hero-video";
 
-// Foto de Martín en obra: placeholder rayado por ahora (next/image cuando
-// haya material real). Overlay gradiente para legibilidad del texto.
+// Video de fondo (reel vertical) con overlay gradiente para legibilidad.
 export function Hero() {
   return (
     <section className="relative bg-grafito">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[#2A2620]" />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "repeating-linear-gradient(135deg, rgba(255,255,255,0.025) 0 13px, rgba(255,255,255,0.05) 13px 26px)",
-          }}
-        />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(to bottom, rgba(25,23,19,0.55) 0%, rgba(25,23,19,0.35) 35%, rgba(25,23,19,0.92) 100%)",
-          }}
-        />
-        <div
-          className="absolute left-[20px] top-[130px] font-mono text-[10.5px] uppercase text-blanco/[0.45]"
-          style={{ letterSpacing: "0.1em" }}
-        >
-          [ Foto · Martín en obra ]
-        </div>
-      </div>
+      <HeroVideo />
 
       <div className="relative mx-auto flex min-h-[600px] max-w-screen-sm flex-col justify-end px-[22px] pb-[56px] pt-[180px]">
         <Reveal>
