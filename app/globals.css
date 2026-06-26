@@ -33,3 +33,17 @@ body {
 .text-balance {
   text-wrap: balance;
 }
+
+/* Impresión / Guardar como PDF: evita páginas en blanco extra.
+   El contenedor usa min-h-screen para la pantalla; en impresión el alto
+   debe ser automático y sin fondos que fuercen una página vacía. */
+@media print {
+  html,
+  body {
+    height: auto !important;
+    background: #fff !important;
+  }
+  @page {
+    margin: 14mm;
+  }
+}

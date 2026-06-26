@@ -136,7 +136,7 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
   const tipoLabel = TIPOS.find((t) => t.value === tipo)?.label ?? "";
 
   return (
-    <div className="min-h-screen bg-blanco text-texto">
+    <div className="min-h-screen bg-blanco text-texto print:min-h-0">
       {/* ─────────── Barra superior (no se imprime) ─────────── */}
       <header className="print:hidden sticky top-0 z-20 border-b border-white/10 bg-grafito-900">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
@@ -525,8 +525,7 @@ function PrintDoc({
           obra, condiciones del terreno y fluctuación de precios de materiales.
         </p>
         <p className="mt-1">
-          FECON · Febre Construcciones · WhatsApp {WA_DISPLAY} ·
-          feconconstrucciones.com.ar
+          FECON · Febre Construcciones · WhatsApp {WA_DISPLAY} · fecon.com.ar
         </p>
       </div>
     </div>
