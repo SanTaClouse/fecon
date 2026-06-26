@@ -2,51 +2,26 @@
 
 import { useMemo, useState } from "react";
 import { ModuloF, Wordmark } from "@/components/marks";
-import { WA_DISPLAY } from "@/lib/whatsapp";
 import {
   type ItemCatalogo,
   type TipoPresupuesto,
   TIPOS,
 } from "@/lib/presupuestos/catalog";
+import { EMPRESA } from "@/lib/presupuestos/empresa";
+import { montoEnLetras } from "@/lib/presupuestos/montoEnLetras";
 import { cn } from "@/lib/utils";
 
-type Seleccion = {
-  on: boolean;
-  qty: number; // medición
-  materiales: number; // tarea
-  manoObra: number; // tarea
-};
-
-type Calc = {
-  subtotal: number;
-  porCat: Map<string, number>;
-  elegidos: { item: ItemCatalogo; monto: number }[];
-  margenMonto: number;
-  neto: number;
-  ivaMonto: number;
-  total: number;
-};
-
+type Seleccion = { on: boolean; cantidad: number; materiales: number; manoObra: number };
 type Categoria = { nombre: string; items: ItemCatalogo[] };
-
-/** Selección inicial de un ítem (toma los valores por defecto del catálogo). */
-function base(item: ItemCatalogo): Seleccion {
-  return { on: false, qty: 1, materiales: item.materiales, manoObra: item.manoObra };
-}
-
-/** Monto del ítem según su modo: medición = cant × unit · tarea = mat + mano. */
-function montoDe(item: ItemCatalogo, s?: Seleccion): number {
-  if (!s) return 0;
-  if (item.modo === "tarea") return (s.materiales || 0) + (s.manoObra || 0);
-  return (s.qty || 0) * item.precioUnitario;
-}
 
 const ars = new Intl.NumberFormat("es-AR", {
   style: "currency",
   currency: "ARS",
   maximumFractionDigits: 0,
 });
-const fmt = (n: number) => ars.format(Math.round(n));
+const fmt = (n: number) => ars.format(Math.round(n || 0));
+const pct = (n: number, total: number) =>
+  total > 0 ? `${((n / total) * 100).toFixed(1)}%` : "—";
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 const fmtFecha = (iso: string) => {
@@ -59,70 +34,64 @@ const fmtFecha = (iso: string) => {
   });
 };
 
+function base(item: ItemCatalogo): Seleccion {
+  return {
+    on: false,
+    cantidad: item.cantidad || 1,
+    materiales: item.materiales,
+    manoObra: item.manoObra,
+  };
+}
+const totalDe = (s?: Seleccion) =>
+  s ? (s.materiales || 0) + (s.manoObra || 0) : 0;
+
 export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
   const [tipo, setTipo] = useState<TipoPresupuesto>("casa_desde_0");
   const [sel, setSel] = useState<Record<string, Seleccion>>({});
-  const [obra, setObra] = useState("");
-  const [cliente, setCliente] = useState("");
+  const [establecimiento, setEstablecimiento] = useState("");
   const [localidad, setLocalidad] = useState("");
+  const [departamento, setDepartamento] = useState("");
+  const [obra, setObra] = useState("");
   const [fecha, setFecha] = useState(hoyISO);
+  const [plazo, setPlazo] = useState("");
   const [notas, setNotas] = useState("");
-  const [margen, setMargen] = useState(0);
-  const [iva, setIva] = useState(21);
 
   const itemsTipo = useMemo(
     () => catalogo.filter((i) => i.tipo === tipo),
     [catalogo, tipo]
   );
 
-  // Categorías en el orden en que aparecen en el catálogo.
-  const categorias = useMemo(() => {
+  const categorias = useMemo<Categoria[]>(() => {
     const map = new Map<string, ItemCatalogo[]>();
     for (const i of itemsTipo) {
       const arr = map.get(i.categoria) ?? [];
       arr.push(i);
       map.set(i.categoria, arr);
     }
-    return Array.from(map.entries()).map(
-      ([nombre, items]): Categoria => ({ nombre, items })
-    );
+    return Array.from(map.entries()).map(([nombre, items]) => ({ nombre, items }));
   }, [itemsTipo]);
 
-  const calc = useMemo(() => {
-    let subtotal = 0;
-    const porCat = new Map<string, number>();
-    const elegidos: { item: ItemCatalogo; monto: number }[] = [];
-    for (const item of itemsTipo) {
-      const s = sel[item.id];
-      const monto = s?.on ? montoDe(item, s) : 0;
-      if (monto > 0) {
-        subtotal += monto;
-        porCat.set(item.categoria, (porCat.get(item.categoria) ?? 0) + monto);
-        elegidos.push({ item, monto });
-      }
+  const total = useMemo(() => {
+    let t = 0;
+    for (const i of itemsTipo) {
+      const s = sel[i.id];
+      if (s?.on) t += totalDe(s);
     }
-    const margenMonto = subtotal * (margen / 100);
-    const neto = subtotal + margenMonto;
-    const ivaMonto = neto * (iva / 100);
-    return {
-      subtotal,
-      porCat,
-      elegidos,
-      margenMonto,
-      neto,
-      ivaMonto,
-      total: neto + ivaMonto,
-    };
-  }, [itemsTipo, sel, margen, iva]);
+    return t;
+  }, [itemsTipo, sel]);
 
-  const hayItems = calc.elegidos.length > 0;
+  const nElegidos = useMemo(
+    () => itemsTipo.filter((i) => sel[i.id]?.on).length,
+    [itemsTipo, sel]
+  );
+  const hayItems = nElegidos > 0;
 
   function update(item: ItemCatalogo, fn: (s: Seleccion) => Seleccion) {
     setSel((prev) => ({ ...prev, [item.id]: fn(prev[item.id] ?? base(item)) }));
   }
   const toggle = (item: ItemCatalogo) => update(item, (s) => ({ ...s, on: !s.on }));
-  const setQty = (item: ItemCatalogo, qty: number) =>
-    update(item, (s) => ({ ...s, on: true, qty: Math.max(0, qty) }));
+  const setCantidad = (item: ItemCatalogo, v: number) =>
+    update(item, (s) => ({ ...s, on: true, cantidad: Math.max(0, v) }));
   const setMateriales = (item: ItemCatalogo, v: number) =>
     update(item, (s) => ({ ...s, on: true, materiales: Math.max(0, v) }));
   const setManoObra = (item: ItemCatalogo, v: number) =>
@@ -137,7 +106,7 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
 
   return (
     <div className="min-h-screen bg-blanco text-texto print:min-h-0">
-      {/* ─────────── Barra superior (no se imprime) ─────────── */}
+      {/* Barra superior (no se imprime) */}
       <header className="print:hidden sticky top-0 z-20 border-b border-white/10 bg-grafito-900">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-2.5">
@@ -164,21 +133,20 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
         </div>
       </header>
 
-      {/* ─────────── Pantalla de trabajo (no se imprime) ─────────── */}
+      {/* Pantalla de trabajo (no se imprime) */}
       <main className="print:hidden mx-auto max-w-5xl px-4 pb-40 pt-6">
         <h1 className="font-display text-2xl font-extrabold tracking-tight text-grafito sm:text-3xl">
           Generador de presupuestos
         </h1>
         <p className="mt-1 max-w-2xl text-[15px] text-muted">
-          Elegí el tipo de obra y tildá los ítems. En los que se miden cargás la{" "}
-          <strong>cantidad</strong>; en las instalaciones <strong>por tarea</strong>{" "}
-          cargás <strong>materiales</strong> y <strong>mano de obra</strong>. El
-          total se calcula solo. Después tocá{" "}
-          <strong>Imprimir / Guardar PDF</strong> para generar el presupuesto con
-          la marca FECON.
+          Elegí el tipo de obra y tildá los ítems. En cada uno cargás la{" "}
+          <strong>cantidad</strong> y los costos de <strong>materiales</strong> y{" "}
+          <strong>mano de obra</strong> (el total se calcula solo). Después tocá{" "}
+          <strong>Imprimir / Guardar PDF</strong> para el presupuesto con formato
+          de planilla.
         </p>
 
-        {/* Tipo de obra */}
+        {/* Tipo */}
         <section className="mt-7">
           <SectionTitle n={1}>Tipo de obra</SectionTitle>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -197,9 +165,7 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
                   <span
                     className={cn(
                       "grid h-5 w-5 place-items-center rounded-full border-2",
-                      tipo === t.value
-                        ? "border-bronce"
-                        : "border-niebla"
+                      tipo === t.value ? "border-bronce" : "border-niebla"
                     )}
                   >
                     {tipo === t.value && (
@@ -216,23 +182,23 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
           </div>
         </section>
 
-        {/* Datos */}
+        {/* Datos de la obra */}
         <section className="mt-8">
-          <SectionTitle n={2}>Datos del presupuesto</SectionTitle>
+          <SectionTitle n={2}>Datos de la obra</SectionTitle>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Field label="Nombre de la obra / proyecto">
+            <Field label="Establecimiento / Cliente">
               <input
-                value={obra}
-                onChange={(e) => setObra(e.target.value)}
-                placeholder="Ej: Vivienda B° Candioti"
+                value={establecimiento}
+                onChange={(e) => setEstablecimiento(e.target.value)}
+                placeholder="Ej: Escuela Nº 6415 Narciso Laprida"
                 className={inputCls}
               />
             </Field>
-            <Field label="Cliente">
+            <Field label="Obra (descripción)">
               <input
-                value={cliente}
-                onChange={(e) => setCliente(e.target.value)}
-                placeholder="Nombre del cliente"
+                value={obra}
+                onChange={(e) => setObra(e.target.value)}
+                placeholder="Ej: Restauración cubierta de tejas"
                 className={inputCls}
               />
             </Field>
@@ -240,15 +206,31 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
               <input
                 value={localidad}
                 onChange={(e) => setLocalidad(e.target.value)}
-                placeholder="Santa Fe"
+                placeholder="San Justo"
                 className={inputCls}
               />
             </Field>
-            <Field label="Fecha">
+            <Field label="Departamento">
+              <input
+                value={departamento}
+                onChange={(e) => setDepartamento(e.target.value)}
+                placeholder="San Justo"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Fecha de cotización">
               <input
                 type="date"
                 value={fecha}
                 onChange={(e) => setFecha(e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Plazo de obra">
+              <input
+                value={plazo}
+                onChange={(e) => setPlazo(e.target.value)}
+                placeholder="Ej: 45 días corridos"
                 className={inputCls}
               />
             </Field>
@@ -260,11 +242,15 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
           <SectionTitle n={3}>Ítems — {tipoLabel}</SectionTitle>
           <div className="mt-3 space-y-3">
             {categorias.map((cat) => {
-              const sub = calc.porCat.get(cat.nombre) ?? 0;
-              const elegidos = cat.items.filter((i) => {
+              let sub = 0;
+              let elegidos = 0;
+              for (const i of cat.items) {
                 const s = sel[i.id];
-                return s?.on && montoDe(i, s) > 0;
-              }).length;
+                if (s?.on) {
+                  sub += totalDe(s);
+                  elegidos++;
+                }
+              }
               return (
                 <details
                   key={cat.nombre}
@@ -284,7 +270,6 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
                       <span className="text-niebla">▾</span>
                     </span>
                   </summary>
-
                   <div className="border-t border-lino-2">
                     {cat.items.map((item) => (
                       <FilaItem
@@ -292,7 +277,7 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
                         item={item}
                         s={sel[item.id]}
                         onToggle={toggle}
-                        onQty={setQty}
+                        onCantidad={setCantidad}
                         onMat={setMateriales}
                         onMano={setManoObra}
                       />
@@ -304,54 +289,30 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
           </div>
         </section>
 
-        {/* Ajustes */}
+        {/* Notas */}
         <section className="mt-8">
-          <SectionTitle n={4}>Ajustes (opcional)</SectionTitle>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Field label="Margen / imprevistos (%)">
-              <input
-                type="number"
-                min={0}
-                step="any"
-                value={margen || ""}
-                placeholder="0"
-                onChange={(e) => setMargen(parseFloat(e.target.value) || 0)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="IVA (%)">
-              <input
-                type="number"
-                min={0}
-                step="any"
-                value={iva || ""}
-                placeholder="0"
-                onChange={(e) => setIva(parseFloat(e.target.value) || 0)}
-                className={inputCls}
-              />
-            </Field>
-          </div>
-          <Field label="Notas / aclaraciones (aparecen en el PDF)" className="mt-3">
+          <SectionTitle n={4}>Notas (opcional)</SectionTitle>
+          <Field label="Aclaraciones que aparecen en el PDF" className="mt-3">
             <textarea
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               rows={3}
-              placeholder="Ej: No incluye honorarios profesionales ni derechos de construcción. Validez 15 días."
+              placeholder="Ej: Presupuesto válido por 15 días. No incluye honorarios profesionales ni derechos de construcción."
               className={cn(inputCls, "resize-y")}
             />
           </Field>
         </section>
       </main>
 
-      {/* ─────────── Barra de total fija (no se imprime) ─────────── */}
+      {/* Barra de total fija (no se imprime) */}
       <div className="print:hidden fixed inset-x-0 bottom-0 z-20 border-t border-lino bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div>
             <div className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted">
-              Total estimado · {calc.elegidos.length} ítems
+              Total · {nElegidos} ítems
             </div>
             <div className="font-display text-2xl font-extrabold text-grafito">
-              {fmt(calc.total)}
+              {fmt(total)}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -372,19 +333,19 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
         </div>
       </div>
 
-      {/* ─────────── Documento para imprimir / PDF ─────────── */}
+      {/* Documento para imprimir / PDF */}
       <PrintDoc
         tipoLabel={tipoLabel}
-        obra={obra}
-        cliente={cliente}
+        establecimiento={establecimiento}
         localidad={localidad}
+        departamento={departamento}
+        obra={obra}
         fecha={fecha}
+        plazo={plazo}
         notas={notas}
         categorias={categorias}
-        calc={calc}
         sel={sel}
-        margen={margen}
-        iva={iva}
+        total={total}
       />
     </div>
   );
@@ -394,29 +355,39 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
 
 function PrintDoc({
   tipoLabel,
-  obra,
-  cliente,
+  establecimiento,
   localidad,
+  departamento,
+  obra,
   fecha,
+  plazo,
   notas,
   categorias,
-  calc,
   sel,
-  margen,
-  iva,
+  total,
 }: {
   tipoLabel: string;
-  obra: string;
-  cliente: string;
+  establecimiento: string;
   localidad: string;
+  departamento: string;
+  obra: string;
   fecha: string;
+  plazo: string;
   notas: string;
   categorias: Categoria[];
-  calc: Calc;
   sel: Record<string, Seleccion>;
-  margen: number;
-  iva: number;
+  total: number;
 }) {
+  // Rubros con al menos un ítem incluido, numerados.
+  const rubros = categorias
+    .map((cat) => ({
+      nombre: cat.nombre,
+      items: cat.items
+        .filter((i) => sel[i.id]?.on)
+        .map((i) => ({ item: i, s: sel[i.id] as Seleccion })),
+    }))
+    .filter((r) => r.items.length > 0);
+
   return (
     <div className="hidden bg-white text-[#1a1a1a] print:block print-doc">
       {/* Encabezado */}
@@ -431,174 +402,178 @@ function PrintDoc({
               FECON
             </div>
             <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-[#736C61]">
-              Febre Construcciones · Santa Fe
+              {EMPRESA.nombre}
             </div>
           </div>
         </div>
         <div className="text-right text-[11px] leading-snug text-[#736C61]">
           <div className="font-display text-[15px] font-bold text-[#211E1A]">
-            Presupuesto de obra
+            Cómputo y Presupuesto
           </div>
           <div>{tipoLabel}</div>
           <div>{fmtFecha(fecha)}</div>
         </div>
       </div>
 
-      {/* Datos */}
-      <div className="mt-3 grid grid-cols-3 gap-3 text-[12px]">
-        <DatoPrint label="Obra / proyecto" valor={obra || "—"} />
-        <DatoPrint label="Cliente" valor={cliente || "—"} />
+      {/* Datos de obra */}
+      <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[12px]">
+        <DatoPrint label="Establecimiento / Cliente" valor={establecimiento || "—"} />
+        <DatoPrint label="Obra" valor={obra || "—"} />
         <DatoPrint label="Localidad" valor={localidad || "—"} />
+        <DatoPrint label="Departamento" valor={departamento || "—"} />
       </div>
 
-      {/* Tabla por categoría */}
-      <table className="mt-4 w-full border-collapse text-[12px]">
+      {/* Tabla */}
+      <table className="mt-4 w-full border-collapse text-[11px]">
         <thead>
-          <tr className="border-b border-[#211E1A] text-left text-[10px] uppercase tracking-wide text-[#736C61]">
-            <th className="py-1.5 pr-2 font-semibold">Ítem</th>
-            <th className="py-1.5 px-2 text-center font-semibold">Un.</th>
-            <th className="py-1.5 px-2 text-right font-semibold">Cant.</th>
-            <th className="py-1.5 px-2 text-right font-semibold">P. unit.</th>
-            <th className="py-1.5 pl-2 text-right font-semibold">Subtotal</th>
+          <tr className="border-y border-[#211E1A] bg-[#F3EEE3] text-left text-[9px] uppercase tracking-wide text-[#211E1A]">
+            <th className="px-1 py-1.5 font-semibold">Nº</th>
+            <th className="px-1 py-1.5 font-semibold">Rubros por tareas</th>
+            <th className="px-1 py-1.5 text-center font-semibold">U</th>
+            <th className="px-1 py-1.5 text-right font-semibold">Cant.</th>
+            <th className="px-1 py-1.5 text-right font-semibold">Materiales</th>
+            <th className="px-1 py-1.5 text-right font-semibold">Mano de obra</th>
+            <th className="px-1 py-1.5 text-right font-semibold">Costo total</th>
+            <th className="px-1 py-1.5 text-right font-semibold">%</th>
           </tr>
         </thead>
         <tbody>
-          {categorias.map((cat) => {
-            const filas = cat.items
-              .map((item) => ({ item, s: sel[item.id] }))
-              .filter(
-                (f): f is { item: ItemCatalogo; s: Seleccion } =>
-                  !!f.s?.on && montoDe(f.item, f.s) > 0
-              );
-            if (filas.length === 0) return null;
-            const sub = calc.porCat.get(cat.nombre) ?? 0;
+          {rubros.map((rubro, ri) => {
+            const sub = rubro.items.reduce((a, { s }) => a + totalDe(s), 0);
             return (
-              <CategoriaPrint
-                key={cat.nombre}
-                nombre={cat.nombre}
+              <RubroPrint
+                key={rubro.nombre}
+                n={ri + 1}
+                nombre={rubro.nombre}
                 sub={sub}
-                filas={filas}
+                total={total}
+                items={rubro.items}
               />
             );
           })}
+          <tr className="border-t-2 border-[#211E1A]">
+            <td colSpan={6} className="px-1 py-2 font-display text-[13px] font-extrabold">
+              TOTAL GENERAL
+            </td>
+            <td className="px-1 py-2 text-right font-display text-[14px] font-extrabold">
+              {fmt(total)}
+            </td>
+            <td className="px-1 py-2 text-right text-[10px] text-[#736C61]">100%</td>
+          </tr>
         </tbody>
       </table>
 
-      {/* Totales */}
-      <div className="mt-4 flex justify-end">
-        <table className="text-[12.5px]">
-          <tbody>
-            <TotalRow label="Subtotal" valor={fmt(calc.subtotal)} />
-            {margen > 0 && (
-              <TotalRow
-                label={`Margen / imprevistos (${margen}%)`}
-                valor={fmt(calc.margenMonto)}
-              />
-            )}
-            {iva > 0 && (
-              <TotalRow label={`IVA (${iva}%)`} valor={fmt(calc.ivaMonto)} />
-            )}
-            <tr className="border-t-2 border-[#211E1A]">
-              <td className="py-2 pr-8 font-display text-[15px] font-extrabold">
-                TOTAL
-              </td>
-              <td className="py-2 text-right font-display text-[16px] font-extrabold">
-                {fmt(calc.total)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      {/* Son pesos */}
+      <div className="mt-3 text-[12px] font-semibold">
+        SON PESOS: {montoEnLetras(total)}.-
       </div>
 
       {/* Notas */}
       {notas.trim() && (
-        <div className="mt-4 border-t border-[#E4DDD0] pt-2 text-[11px] leading-snug text-[#3a3a3a]">
+        <div className="mt-3 border-t border-[#E4DDD0] pt-2 text-[11px] leading-snug text-[#3a3a3a]">
           <div className="font-semibold text-[#211E1A]">Notas</div>
           <p className="whitespace-pre-wrap">{notas}</p>
         </div>
       )}
 
+      {/* Datos del contratista + firma */}
+      <div className="mt-5 grid grid-cols-2 gap-6 border-t border-[#E4DDD0] pt-3 text-[10.5px] leading-snug">
+        <div className="text-[#3a3a3a]">
+          <Linea label="Empresa / Contratista" valor={EMPRESA.nombre} />
+          <Linea label="Dirección" valor={EMPRESA.direccion} />
+          <Linea label="Ingresos Brutos Nº" valor={EMPRESA.iibb} />
+          <Linea label="C.U.I.T. Nº" valor={EMPRESA.cuit} />
+          <Linea label="Celular" valor={EMPRESA.celular} />
+          <Linea label="E-mail" valor={EMPRESA.email} />
+          <Linea label="Plazo de obra" valor={plazo || "—"} />
+          <Linea label="Fecha de cotización" valor={fmtFecha(fecha)} />
+        </div>
+        <div className="flex flex-col items-center justify-end">
+          <div className="mt-10 w-full border-t border-[#211E1A]" />
+          <div className="mt-1 text-center text-[10px] text-[#736C61]">
+            Firma y sello del o los titulares
+          </div>
+        </div>
+      </div>
+
       {/* Pie */}
-      <div className="mt-6 border-t border-[#E4DDD0] pt-2 text-[10px] leading-snug text-[#736C61]">
+      <div className="mt-5 border-t border-[#E4DDD0] pt-2 text-[9.5px] leading-snug text-[#736C61]">
         <p>
           Presupuesto estimativo. Los valores pueden variar según relevamiento en
-          obra, condiciones del terreno y fluctuación de precios de materiales.
+          obra, condiciones del lugar y fluctuación de precios de materiales.
         </p>
         <p className="mt-1">
-          FECON · Febre Construcciones · WhatsApp {WA_DISPLAY} · fecon.com.ar
+          FECON · Febre Construcciones · WhatsApp {EMPRESA.celular} · {EMPRESA.web}
         </p>
       </div>
     </div>
   );
 }
 
-function CategoriaPrint({
+function RubroPrint({
+  n,
   nombre,
   sub,
-  filas,
+  total,
+  items,
 }: {
+  n: number;
   nombre: string;
   sub: number;
-  filas: { item: ItemCatalogo; s: Seleccion }[];
+  total: number;
+  items: { item: ItemCatalogo; s: Seleccion }[];
 }) {
   return (
     <>
       <tr className="bg-[#F3EEE3]">
-        <td colSpan={4} className="px-1 py-1 font-display text-[11.5px] font-bold">
+        <td className="px-1 py-1 font-display text-[11px] font-bold">{n}</td>
+        <td className="px-1 py-1 font-display text-[11px] font-bold uppercase" colSpan={5}>
           {nombre}
         </td>
-        <td className="px-1 py-1 text-right font-mono text-[11px] text-[#736C61]">
+        <td className="px-1 py-1 text-right font-mono text-[10px] text-[#736C61]">
           {fmt(sub)}
         </td>
+        <td className="px-1 py-1 text-right text-[9px] text-[#736C61]">
+          {pct(sub, total)}
+        </td>
       </tr>
-      {filas.map(({ item, s }) =>
-        item.modo === "tarea" ? (
-          <tr key={item.id} className="border-b border-[#EDE7DB]">
-            <td className="py-1 pr-2">
-              {item.item}
-              <div className="text-[10px] text-[#736C61]">
-                Materiales {fmt(s.materiales)} · Mano de obra {fmt(s.manoObra)}
-              </div>
+      {items.map(({ item, s }, idx) => {
+        const t = totalDe(s);
+        return (
+          <tr key={item.id} className="border-b border-[#EDE7DB] align-top">
+            <td className="px-1 py-1 text-[#736C61]">
+              {n}.{idx + 1}
             </td>
-            <td className="py-1 px-2 text-center text-[#736C61]">tarea</td>
-            <td className="py-1 px-2 text-right text-[#736C61]">—</td>
-            <td className="py-1 px-2 text-right text-[#736C61]">—</td>
-            <td className="py-1 pl-2 text-right font-semibold">
-              {fmt(montoDe(item, s))}
-            </td>
+            <td className="px-1 py-1">{item.item}</td>
+            <td className="px-1 py-1 text-center text-[#736C61]">{item.unidad}</td>
+            <td className="px-1 py-1 text-right">{s.cantidad}</td>
+            <td className="px-1 py-1 text-right">{fmt(s.materiales)}</td>
+            <td className="px-1 py-1 text-right">{fmt(s.manoObra)}</td>
+            <td className="px-1 py-1 text-right font-semibold">{fmt(t)}</td>
+            <td className="px-1 py-1 text-right text-[#736C61]">{pct(t, total)}</td>
           </tr>
-        ) : (
-          <tr key={item.id} className="border-b border-[#EDE7DB]">
-            <td className="py-1 pr-2">{item.item}</td>
-            <td className="py-1 px-2 text-center text-[#736C61]">{item.unidad}</td>
-            <td className="py-1 px-2 text-right">{s.qty}</td>
-            <td className="py-1 px-2 text-right">{fmt(item.precioUnitario)}</td>
-            <td className="py-1 pl-2 text-right font-semibold">
-              {fmt(montoDe(item, s))}
-            </td>
-          </tr>
-        )
-      )}
+        );
+      })}
     </>
-  );
-}
-
-function TotalRow({ label, valor }: { label: string; valor: string }) {
-  return (
-    <tr>
-      <td className="py-0.5 pr-8 text-[#3a3a3a]">{label}</td>
-      <td className="py-0.5 text-right font-mono font-semibold">{valor}</td>
-    </tr>
   );
 }
 
 function DatoPrint({ label, valor }: { label: string; valor: string }) {
   return (
     <div>
-      <div className="font-mono text-[9px] uppercase tracking-wide text-[#736C61]">
-        {label}
-      </div>
-      <div className="font-semibold text-[#211E1A]">{valor}</div>
+      <span className="font-mono text-[9px] uppercase tracking-wide text-[#736C61]">
+        {label}:{" "}
+      </span>
+      <span className="font-semibold text-[#211E1A]">{valor}</span>
+    </div>
+  );
+}
+
+function Linea({ label, valor }: { label: string; valor: string }) {
+  return (
+    <div>
+      <span className="text-[#736C61]">{label}: </span>
+      <span className="font-semibold text-[#211E1A]">{valor}</span>
     </div>
   );
 }
@@ -608,103 +583,74 @@ function DatoPrint({ label, valor }: { label: string; valor: string }) {
 const inputCls =
   "w-full rounded-xl border border-lino bg-white px-3.5 py-2.5 text-[15px] text-texto outline-none placeholder:text-niebla focus:border-bronce";
 
-/** Fila de un ítem en la pantalla. Se adapta al modo (medición / tarea). */
 function FilaItem({
   item,
   s,
   onToggle,
-  onQty,
+  onCantidad,
   onMat,
   onMano,
 }: {
   item: ItemCatalogo;
   s?: Seleccion;
   onToggle: (i: ItemCatalogo) => void;
-  onQty: (i: ItemCatalogo, v: number) => void;
+  onCantidad: (i: ItemCatalogo, v: number) => void;
   onMat: (i: ItemCatalogo, v: number) => void;
   onMano: (i: ItemCatalogo, v: number) => void;
 }) {
   const on = !!s?.on;
-  const monto = on ? montoDe(item, s) : 0;
+  const t = on ? totalDe(s) : 0;
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-lino-2 px-4 py-2.5 first:border-t-0 sm:flex-nowrap",
+        "flex flex-wrap items-end gap-x-3 gap-y-2 border-t border-lino-2 px-4 py-2.5 first:border-t-0",
         on && "bg-bronce/[0.04]"
       )}
     >
-      <input
-        type="checkbox"
-        checked={on}
-        onChange={() => onToggle(item)}
-        className="shrink-0 accent-bronce"
-        style={{ width: 18, height: 18 }}
-        aria-label={`Incluir ${item.item}`}
-      />
-      <button
-        onClick={() => onToggle(item)}
-        className="min-w-[160px] flex-1 text-left text-[14.5px] text-texto"
-      >
-        {item.item}
-        {item.modo === "tarea" ? (
-          <span className="ml-2 rounded bg-bronce/15 px-1.5 py-0.5 font-mono text-[10.5px] uppercase text-bronce">
-            por tarea
-          </span>
-        ) : (
+      <div className="flex flex-1 items-center gap-3 self-center" style={{ minWidth: 180 }}>
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={() => onToggle(item)}
+          className="shrink-0 accent-bronce"
+          style={{ width: 18, height: 18 }}
+          aria-label={`Incluir ${item.item}`}
+        />
+        <button
+          onClick={() => onToggle(item)}
+          className="flex-1 text-left text-[14.5px] text-texto"
+        >
+          {item.item}
           <span className="ml-2 rounded bg-lino px-1.5 py-0.5 font-mono text-[10.5px] uppercase text-muted">
             {item.unidad}
           </span>
-        )}
-      </button>
-
-      {item.modo === "tarea" ? (
-        <div className="flex items-end gap-2">
-          <MiniMoney
-            label="Materiales"
-            value={on ? s!.materiales : undefined}
-            onChange={(v) => onMat(item, v)}
-          />
-          <span className="pb-1.5 text-niebla">+</span>
-          <MiniMoney
-            label="Mano de obra"
-            value={on ? s!.manoObra : undefined}
-            onChange={(v) => onMano(item, v)}
-          />
+        </button>
+      </div>
+      <MiniNum label="Cant." value={on ? s!.cantidad : undefined} onChange={(v) => onCantidad(item, v)} money={false} />
+      <MiniNum label="Materiales" value={on ? s!.materiales : undefined} onChange={(v) => onMat(item, v)} />
+      <MiniNum label="Mano de obra" value={on ? s!.manoObra : undefined} onChange={(v) => onMano(item, v)} />
+      <div className="w-28 shrink-0 text-right">
+        <div className="font-mono text-[9.5px] uppercase tracking-wide text-niebla">
+          Total
         </div>
-      ) : (
-        <>
-          <span className="w-28 shrink-0 text-right font-mono text-[13px] text-muted">
-            {fmt(item.precioUnitario)}
-          </span>
-          <input
-            type="number"
-            min={0}
-            step="any"
-            value={on ? s!.qty : ""}
-            placeholder="0"
-            onChange={(e) => onQty(item, parseFloat(e.target.value) || 0)}
-            className="w-20 shrink-0 rounded-lg border border-lino bg-white px-2 py-1.5 text-right text-[14px] outline-none focus:border-bronce"
-            aria-label={`Cantidad de ${item.item}`}
-          />
-        </>
-      )}
-
-      <span className="w-28 shrink-0 text-right font-mono text-[14px] font-semibold text-grafito">
-        {on ? fmt(monto) : "—"}
-      </span>
+        <div className="font-mono text-[14px] font-semibold text-grafito">
+          {on ? fmt(t) : "—"}
+        </div>
+      </div>
     </div>
   );
 }
 
-/** Input de dinero compacto con etiqueta (para Materiales / Mano de obra). */
-function MiniMoney({
+function MiniNum({
   label,
   value,
   onChange,
+  money = true,
 }: {
   label: string;
   value: number | undefined;
   onChange: (v: number) => void;
+  money?: boolean;
 }) {
   return (
     <label className="block">
@@ -712,7 +658,7 @@ function MiniMoney({
         {label}
       </span>
       <div className="flex items-center rounded-lg border border-lino bg-white pl-1.5 focus-within:border-bronce">
-        <span className="text-[12px] text-niebla">$</span>
+        {money && <span className="text-[12px] text-niebla">$</span>}
         <input
           type="number"
           min={0}
@@ -720,7 +666,10 @@ function MiniMoney({
           value={value ?? ""}
           placeholder="0"
           onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-          className="w-24 bg-transparent px-1 py-1.5 text-right text-[13.5px] outline-none"
+          className={cn(
+            "bg-transparent px-1 py-1.5 text-right text-[13.5px] outline-none",
+            money ? "w-24" : "w-16"
+          )}
           aria-label={label}
         />
       </div>
@@ -734,9 +683,7 @@ function SectionTitle({ n, children }: { n: number; children: React.ReactNode })
       <span className="grid h-6 w-6 place-items-center rounded-full bg-grafito font-mono text-[12px] font-bold text-blanco">
         {n}
       </span>
-      <h2 className="font-display text-[18px] font-bold text-grafito">
-        {children}
-      </h2>
+      <h2 className="font-display text-[18px] font-bold text-grafito">{children}</h2>
     </div>
   );
 }
