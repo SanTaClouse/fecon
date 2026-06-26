@@ -121,6 +121,22 @@ export async function guardarCatalogo(items: FilaCatalogo[]): Promise<number> {
   }
 
   await sql.transaction([
+    // Crea la tabla si aún no existe (auto-bootstrap en producción).
+    sql`
+      CREATE TABLE IF NOT EXISTS catalogo (
+        id BIGSERIAL PRIMARY KEY,
+        tipo TEXT NOT NULL,
+        categoria TEXT NOT NULL,
+        item TEXT NOT NULL,
+        modo TEXT NOT NULL DEFAULT 'medicion',
+        unidad TEXT NOT NULL DEFAULT 'u',
+        precio_unitario NUMERIC NOT NULL DEFAULT 0,
+        materiales NUMERIC NOT NULL DEFAULT 0,
+        mano_obra NUMERIC NOT NULL DEFAULT 0,
+        orden INTEGER NOT NULL DEFAULT 0,
+        actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `,
     sql`DELETE FROM catalogo`,
     ...filas.map(
       (it, i) => sql`
