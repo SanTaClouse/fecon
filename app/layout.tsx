@@ -26,7 +26,7 @@ const mono = Space_Mono({
   display: "swap",
 });
 
-const SITE = "https://feconconstrucciones.com.ar";
+const SITE = "https://fecon.com.ar";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
@@ -52,6 +52,11 @@ export const metadata: Metadata = {
       "16 años de oficio. Casas llave en mano, remodelaciones y especialistas en techos de tejas en Santa Fe. Equipo propio, trato directo con el dueño.",
   },
   robots: { index: true, follow: true },
+  appleWebApp: {
+    capable: true,
+    title: "FECON",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
