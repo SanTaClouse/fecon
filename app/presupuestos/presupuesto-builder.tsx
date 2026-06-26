@@ -10,12 +10,17 @@ import {
 } from "@/lib/presupuestos/catalog";
 import { cn } from "@/lib/utils";
 
-type Seleccion = { on: boolean; qty: number };
+type Seleccion = {
+  on: boolean;
+  qty: number; // medición
+  materiales: number; // tarea
+  manoObra: number; // tarea
+};
 
 type Calc = {
   subtotal: number;
   porCat: Map<string, number>;
-  elegidos: { item: ItemCatalogo; qty: number; monto: number }[];
+  elegidos: { item: ItemCatalogo; monto: number }[];
   margenMonto: number;
   neto: number;
   ivaMonto: number;
@@ -23,6 +28,18 @@ type Calc = {
 };
 
 type Categoria = { nombre: string; items: ItemCatalogo[] };
+
+/** Selección inicial de un ítem (toma los valores por defecto del catálogo). */
+function base(item: ItemCatalogo): Seleccion {
+  return { on: false, qty: 1, materiales: item.materiales, manoObra: item.manoObra };
+}
+
+/** Monto del ítem según su modo: medición = cant × unit · tarea = mat + mano. */
+function montoDe(item: ItemCatalogo, s?: Seleccion): number {
+  if (!s) return 0;
+  if (item.modo === "tarea") return (s.materiales || 0) + (s.manoObra || 0);
+  return (s.qty || 0) * item.precioUnitario;
+}
 
 const ars = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -74,14 +91,14 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
   const calc = useMemo(() => {
     let subtotal = 0;
     const porCat = new Map<string, number>();
-    const elegidos: { item: ItemCatalogo; qty: number; monto: number }[] = [];
+    const elegidos: { item: ItemCatalogo; monto: number }[] = [];
     for (const item of itemsTipo) {
       const s = sel[item.id];
-      if (s?.on && s.qty > 0) {
-        const monto = s.qty * item.precioUnitario;
+      const monto = s?.on ? montoDe(item, s) : 0;
+      if (monto > 0) {
         subtotal += monto;
         porCat.set(item.categoria, (porCat.get(item.categoria) ?? 0) + monto);
-        elegidos.push({ item, qty: s.qty, monto });
+        elegidos.push({ item, monto });
       }
     }
     const margenMonto = subtotal * (margen / 100);
@@ -100,19 +117,17 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
 
   const hayItems = calc.elegidos.length > 0;
 
-  function toggle(id: string) {
-    setSel((prev) => {
-      const cur = prev[id];
-      const on = !(cur?.on ?? false);
-      return { ...prev, [id]: { on, qty: on ? cur?.qty || 1 : cur?.qty ?? 1 } };
-    });
+  function update(item: ItemCatalogo, fn: (s: Seleccion) => Seleccion) {
+    setSel((prev) => ({ ...prev, [item.id]: fn(prev[item.id] ?? base(item)) }));
   }
-  function setQty(id: string, qty: number) {
-    setSel((prev) => ({
-      ...prev,
-      [id]: { on: prev[id]?.on ?? qty > 0, qty: Math.max(0, qty) },
-    }));
-  }
+  const toggle = (item: ItemCatalogo) => update(item, (s) => ({ ...s, on: !s.on }));
+  const setQty = (item: ItemCatalogo, qty: number) =>
+    update(item, (s) => ({ ...s, on: true, qty: Math.max(0, qty) }));
+  const setMateriales = (item: ItemCatalogo, v: number) =>
+    update(item, (s) => ({ ...s, on: true, materiales: Math.max(0, v) }));
+  const setManoObra = (item: ItemCatalogo, v: number) =>
+    update(item, (s) => ({ ...s, on: true, manoObra: Math.max(0, v) }));
+
   function vaciar() {
     if (hayItems && !confirm("¿Vaciar el presupuesto y empezar de nuevo?")) return;
     setSel({});
@@ -147,8 +162,10 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
           Generador de presupuestos
         </h1>
         <p className="mt-1 max-w-2xl text-[15px] text-muted">
-          Elegí el tipo de obra, tildá los ítems que correspondan y cargá las
-          cantidades. El total se calcula solo. Después tocá{" "}
+          Elegí el tipo de obra y tildá los ítems. En los que se miden cargás la{" "}
+          <strong>cantidad</strong>; en las instalaciones <strong>por tarea</strong>{" "}
+          cargás <strong>materiales</strong> y <strong>mano de obra</strong>. El
+          total se calcula solo. Después tocá{" "}
           <strong>Imprimir / Guardar PDF</strong> para generar el presupuesto con
           la marca FECON.
         </p>
@@ -236,9 +253,10 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
           <div className="mt-3 space-y-3">
             {categorias.map((cat) => {
               const sub = calc.porCat.get(cat.nombre) ?? 0;
-              const elegidos = cat.items.filter(
-                (i) => sel[i.id]?.on && (sel[i.id]?.qty ?? 0) > 0
-              ).length;
+              const elegidos = cat.items.filter((i) => {
+                const s = sel[i.id];
+                return s?.on && montoDe(i, s) > 0;
+              }).length;
               return (
                 <details
                   key={cat.nombre}
@@ -260,57 +278,17 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
                   </summary>
 
                   <div className="border-t border-lino-2">
-                    {cat.items.map((item) => {
-                      const s = sel[item.id];
-                      const on = !!s?.on;
-                      const qty = s?.qty ?? 1;
-                      const monto = on ? qty * item.precioUnitario : 0;
-                      return (
-                        <div
-                          key={item.id}
-                          className={cn(
-                            "flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-lino-2 px-4 py-2.5 first:border-t-0 sm:flex-nowrap",
-                            on && "bg-bronce/[0.04]"
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={on}
-                            onChange={() => toggle(item.id)}
-                            className="h-4.5 w-4.5 shrink-0 accent-bronce"
-                            style={{ width: 18, height: 18 }}
-                            aria-label={`Incluir ${item.item}`}
-                          />
-                          <button
-                            onClick={() => toggle(item.id)}
-                            className="min-w-[160px] flex-1 text-left text-[14.5px] text-texto"
-                          >
-                            {item.item}
-                            <span className="ml-2 rounded bg-lino px-1.5 py-0.5 font-mono text-[10.5px] uppercase text-muted">
-                              {item.unidad}
-                            </span>
-                          </button>
-                          <span className="w-28 shrink-0 text-right font-mono text-[13px] text-muted">
-                            {fmt(item.precioUnitario)}
-                          </span>
-                          <input
-                            type="number"
-                            min={0}
-                            step="any"
-                            value={on ? qty : ""}
-                            placeholder="0"
-                            onChange={(e) =>
-                              setQty(item.id, parseFloat(e.target.value) || 0)
-                            }
-                            className="w-20 shrink-0 rounded-lg border border-lino bg-white px-2 py-1.5 text-right text-[14px] outline-none focus:border-bronce"
-                            aria-label={`Cantidad de ${item.item}`}
-                          />
-                          <span className="w-28 shrink-0 text-right font-mono text-[14px] font-semibold text-grafito">
-                            {on ? fmt(monto) : "—"}
-                          </span>
-                        </div>
-                      );
-                    })}
+                    {cat.items.map((item) => (
+                      <FilaItem
+                        key={item.id}
+                        item={item}
+                        s={sel[item.id]}
+                        onToggle={toggle}
+                        onQty={setQty}
+                        onMat={setMateriales}
+                        onMano={setManoObra}
+                      />
+                    ))}
                   </div>
                 </details>
               );
@@ -478,9 +456,12 @@ function PrintDoc({
         </thead>
         <tbody>
           {categorias.map((cat) => {
-            const filas = cat.items.filter(
-              (i) => sel[i.id]?.on && (sel[i.id]?.qty ?? 0) > 0
-            );
+            const filas = cat.items
+              .map((item) => ({ item, s: sel[item.id] }))
+              .filter(
+                (f): f is { item: ItemCatalogo; s: Seleccion } =>
+                  !!f.s?.on && montoDe(f.item, f.s) > 0
+              );
             if (filas.length === 0) return null;
             const sub = calc.porCat.get(cat.nombre) ?? 0;
             return (
@@ -488,10 +469,7 @@ function PrintDoc({
                 key={cat.nombre}
                 nombre={cat.nombre}
                 sub={sub}
-                filas={filas.map((i) => ({
-                  item: i,
-                  qty: sel[i.id]!.qty,
-                }))}
+                filas={filas}
               />
             );
           })}
@@ -554,7 +532,7 @@ function CategoriaPrint({
 }: {
   nombre: string;
   sub: number;
-  filas: { item: ItemCatalogo; qty: number }[];
+  filas: { item: ItemCatalogo; s: Seleccion }[];
 }) {
   return (
     <>
@@ -566,17 +544,34 @@ function CategoriaPrint({
           {fmt(sub)}
         </td>
       </tr>
-      {filas.map(({ item, qty }) => (
-        <tr key={item.id} className="border-b border-[#EDE7DB]">
-          <td className="py-1 pr-2">{item.item}</td>
-          <td className="py-1 px-2 text-center text-[#736C61]">{item.unidad}</td>
-          <td className="py-1 px-2 text-right">{qty}</td>
-          <td className="py-1 px-2 text-right">{fmt(item.precioUnitario)}</td>
-          <td className="py-1 pl-2 text-right font-semibold">
-            {fmt(qty * item.precioUnitario)}
-          </td>
-        </tr>
-      ))}
+      {filas.map(({ item, s }) =>
+        item.modo === "tarea" ? (
+          <tr key={item.id} className="border-b border-[#EDE7DB]">
+            <td className="py-1 pr-2">
+              {item.item}
+              <div className="text-[10px] text-[#736C61]">
+                Materiales {fmt(s.materiales)} · Mano de obra {fmt(s.manoObra)}
+              </div>
+            </td>
+            <td className="py-1 px-2 text-center text-[#736C61]">tarea</td>
+            <td className="py-1 px-2 text-right text-[#736C61]">—</td>
+            <td className="py-1 px-2 text-right text-[#736C61]">—</td>
+            <td className="py-1 pl-2 text-right font-semibold">
+              {fmt(montoDe(item, s))}
+            </td>
+          </tr>
+        ) : (
+          <tr key={item.id} className="border-b border-[#EDE7DB]">
+            <td className="py-1 pr-2">{item.item}</td>
+            <td className="py-1 px-2 text-center text-[#736C61]">{item.unidad}</td>
+            <td className="py-1 px-2 text-right">{s.qty}</td>
+            <td className="py-1 px-2 text-right">{fmt(item.precioUnitario)}</td>
+            <td className="py-1 pl-2 text-right font-semibold">
+              {fmt(montoDe(item, s))}
+            </td>
+          </tr>
+        )
+      )}
     </>
   );
 }
@@ -605,6 +600,126 @@ function DatoPrint({ label, valor }: { label: string; valor: string }) {
 
 const inputCls =
   "w-full rounded-xl border border-lino bg-white px-3.5 py-2.5 text-[15px] text-texto outline-none placeholder:text-niebla focus:border-bronce";
+
+/** Fila de un ítem en la pantalla. Se adapta al modo (medición / tarea). */
+function FilaItem({
+  item,
+  s,
+  onToggle,
+  onQty,
+  onMat,
+  onMano,
+}: {
+  item: ItemCatalogo;
+  s?: Seleccion;
+  onToggle: (i: ItemCatalogo) => void;
+  onQty: (i: ItemCatalogo, v: number) => void;
+  onMat: (i: ItemCatalogo, v: number) => void;
+  onMano: (i: ItemCatalogo, v: number) => void;
+}) {
+  const on = !!s?.on;
+  const monto = on ? montoDe(item, s) : 0;
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-lino-2 px-4 py-2.5 first:border-t-0 sm:flex-nowrap",
+        on && "bg-bronce/[0.04]"
+      )}
+    >
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={() => onToggle(item)}
+        className="shrink-0 accent-bronce"
+        style={{ width: 18, height: 18 }}
+        aria-label={`Incluir ${item.item}`}
+      />
+      <button
+        onClick={() => onToggle(item)}
+        className="min-w-[160px] flex-1 text-left text-[14.5px] text-texto"
+      >
+        {item.item}
+        {item.modo === "tarea" ? (
+          <span className="ml-2 rounded bg-bronce/15 px-1.5 py-0.5 font-mono text-[10.5px] uppercase text-bronce">
+            por tarea
+          </span>
+        ) : (
+          <span className="ml-2 rounded bg-lino px-1.5 py-0.5 font-mono text-[10.5px] uppercase text-muted">
+            {item.unidad}
+          </span>
+        )}
+      </button>
+
+      {item.modo === "tarea" ? (
+        <div className="flex items-end gap-2">
+          <MiniMoney
+            label="Materiales"
+            value={on ? s!.materiales : undefined}
+            onChange={(v) => onMat(item, v)}
+          />
+          <span className="pb-1.5 text-niebla">+</span>
+          <MiniMoney
+            label="Mano de obra"
+            value={on ? s!.manoObra : undefined}
+            onChange={(v) => onMano(item, v)}
+          />
+        </div>
+      ) : (
+        <>
+          <span className="w-28 shrink-0 text-right font-mono text-[13px] text-muted">
+            {fmt(item.precioUnitario)}
+          </span>
+          <input
+            type="number"
+            min={0}
+            step="any"
+            value={on ? s!.qty : ""}
+            placeholder="0"
+            onChange={(e) => onQty(item, parseFloat(e.target.value) || 0)}
+            className="w-20 shrink-0 rounded-lg border border-lino bg-white px-2 py-1.5 text-right text-[14px] outline-none focus:border-bronce"
+            aria-label={`Cantidad de ${item.item}`}
+          />
+        </>
+      )}
+
+      <span className="w-28 shrink-0 text-right font-mono text-[14px] font-semibold text-grafito">
+        {on ? fmt(monto) : "—"}
+      </span>
+    </div>
+  );
+}
+
+/** Input de dinero compacto con etiqueta (para Materiales / Mano de obra). */
+function MiniMoney({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number | undefined;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-0.5 block text-center font-mono text-[9.5px] uppercase tracking-wide text-niebla">
+        {label}
+      </span>
+      <div className="flex items-center rounded-lg border border-lino bg-white pl-1.5 focus-within:border-bronce">
+        <span className="text-[12px] text-niebla">$</span>
+        <input
+          type="number"
+          min={0}
+          step="any"
+          value={value ?? ""}
+          placeholder="0"
+          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          className="w-24 bg-transparent px-1 py-1.5 text-right text-[13.5px] outline-none"
+          aria-label={label}
+        />
+      </div>
+    </label>
+  );
+}
 
 function SectionTitle({ n, children }: { n: number; children: React.ReactNode }) {
   return (
