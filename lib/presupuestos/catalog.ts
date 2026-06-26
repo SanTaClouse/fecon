@@ -36,17 +36,17 @@ export const TIPOS: {
   label: string;
   desc: string;
 }[] = [
-  {
-    value: "casa_desde_0",
-    label: "Casa desde cero",
-    desc: "Obra nueva — del replanteo del terreno a las terminaciones",
-  },
-  {
-    value: "remodelacion",
-    label: "Remodelación",
-    desc: "Refacción y puesta en valor de lo existente",
-  },
-];
+    {
+      value: "casa_desde_0",
+      label: "Casa desde cero",
+      desc: "Obra nueva — del replanteo del terreno a las terminaciones",
+    },
+    {
+      value: "remodelacion",
+      label: "Remodelación",
+      desc: "Refacción y puesta en valor de lo existente",
+    },
+  ];
 
 // ───────────────────────── Catálogo de ejemplo ─────────────────────────
 // Precios en pesos (ARS), valores de referencia. Reemplazalos por los reales.
@@ -122,8 +122,9 @@ const SEED: FilaCatalogo[] = [
 
   tarea("casa_desde_0", "Instalación de gas", "Cañería y conexión de artefactos de gas", 360000, 320000),
 
-  med("casa_desde_0", "Revoques", "Revoque grueso y fino interior", "m²", 12500),
-  med("casa_desde_0", "Revoques", "Revoque exterior impermeable", "m²", 15000),
+  med("casa_desde_0", "Revoques", "Macillado", "m²", 12500),
+  med("casa_desde_0", "Revoques", "Revoque grueso ", "m²", 35000),
+  med("casa_desde_0", "Revoques", "Revoque  impermeable", "m²", 35000),
 
   med("casa_desde_0", "Contrapisos y carpetas", "Contrapiso", "m²", 11000),
   med("casa_desde_0", "Contrapisos y carpetas", "Carpeta de nivelación", "m²", 8500),
