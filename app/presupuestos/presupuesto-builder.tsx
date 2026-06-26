@@ -147,12 +147,20 @@ export function PresupuestoBuilder({ catalogo }: { catalogo: ItemCatalogo[] }) {
               Presupuestos
             </span>
           </div>
-          <a
-            href="/"
-            className="rounded-full border border-blanco/30 px-3.5 py-1.5 font-sans text-[13px] font-bold text-blanco no-underline hover:bg-white/5"
-          >
-            ← Volver al sitio
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href="/presupuestos/admin"
+              className="rounded-full border border-bronce/60 bg-bronce/15 px-3.5 py-1.5 font-sans text-[13px] font-bold text-blanco no-underline hover:bg-bronce/25"
+            >
+              Editar catálogo
+            </a>
+            <a
+              href="/"
+              className="rounded-full border border-blanco/30 px-3.5 py-1.5 font-sans text-[13px] font-bold text-blanco no-underline hover:bg-white/5"
+            >
+              ← Volver al sitio
+            </a>
+          </div>
         </div>
       </header>
 

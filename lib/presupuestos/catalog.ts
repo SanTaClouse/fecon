@@ -1,4 +1,4 @@
-// Catálogo de ítems para el generador de presupuestos.
+// Tipos y catálogo base del generador de presupuestos.
 //
 // Dos MODOS de ítem (clave para que los números sean razonables):
 //
@@ -9,10 +9,10 @@
 //   • "tarea": se cobra como partida por sector, con  Materiales $ + Mano de
 //       obra $ = total. NO se multiplica por cantidad ni tiene "unitario".
 //       Ej: instalación de agua/cloaca/gas por sector (baño, cocina, lavadero).
-//       Es como Martín lo pasa en su Excel.
 //
-// HOY los datos viven en SEED (de ejemplo — editá libre). El paso siguiente es
-// pasarlos a una base Neon (Postgres) con un panel para editarlos desde la web.
+// La FUENTE de datos real es la base Neon (ver lib/presupuestos/db.ts). El SEED
+// de abajo se usa para: (1) sembrar la base la primera vez, (2) el botón
+// "restaurar ejemplos" del panel, y (3) fallback si la base no responde.
 
 export type TipoPresupuesto = "casa_desde_0" | "remodelacion";
 export type ModoItem = "medicion" | "tarea";
@@ -24,11 +24,11 @@ export type FilaCatalogo = {
   modo: ModoItem;
   unidad: string; // medición: "m²", "ml"… · tarea: "tarea"
   precioUnitario: number; // medición
-  materiales: number; // tarea (valor por defecto sugerido)
-  manoObra: number; // tarea (valor por defecto sugerido)
+  materiales: number; // tarea
+  manoObra: number; // tarea
 };
 
-/** Fila del catálogo con un id estable (asignado al cargar). */
+/** Fila del catálogo con un id estable (el id de la fila en la base). */
 export type ItemCatalogo = FilaCatalogo & { id: string };
 
 export const TIPOS: {
@@ -36,20 +36,20 @@ export const TIPOS: {
   label: string;
   desc: string;
 }[] = [
-    {
-      value: "casa_desde_0",
-      label: "Casa desde cero",
-      desc: "Obra nueva — del replanteo del terreno a las terminaciones",
-    },
-    {
-      value: "remodelacion",
-      label: "Remodelación",
-      desc: "Refacción y puesta en valor de lo existente",
-    },
-  ];
+  {
+    value: "casa_desde_0",
+    label: "Casa desde cero",
+    desc: "Obra nueva — del replanteo del terreno a las terminaciones",
+  },
+  {
+    value: "remodelacion",
+    label: "Remodelación",
+    desc: "Refacción y puesta en valor de lo existente",
+  },
+];
 
 // ───────────────────────── Catálogo de ejemplo ─────────────────────────
-// Precios en pesos (ARS), valores de referencia. Reemplazalos por los reales.
+// Precios en pesos (ARS), valores de referencia. Editables desde el panel.
 
 /** Ítem por medición: cantidad × precio unitario. */
 const med = (
@@ -87,7 +87,7 @@ const tarea = (
   manoObra,
 });
 
-const SEED: FilaCatalogo[] = [
+export const SEED: FilaCatalogo[] = [
   // ===================== CASA DESDE CERO =====================
   med("casa_desde_0", "Trabajos preliminares", "Limpieza y nivelación del terreno", "m²", 3500),
   med("casa_desde_0", "Trabajos preliminares", "Replanteo y marcación de obra", "m²", 4200),
@@ -123,8 +123,8 @@ const SEED: FilaCatalogo[] = [
   tarea("casa_desde_0", "Instalación de gas", "Cañería y conexión de artefactos de gas", 360000, 320000),
 
   med("casa_desde_0", "Revoques", "Macillado", "m²", 12500),
-  med("casa_desde_0", "Revoques", "Revoque grueso ", "m²", 35000),
-  med("casa_desde_0", "Revoques", "Revoque  impermeable", "m²", 35000),
+  med("casa_desde_0", "Revoques", "Revoque grueso", "m²", 35000),
+  med("casa_desde_0", "Revoques", "Revoque exterior impermeable", "m²", 35000),
 
   med("casa_desde_0", "Contrapisos y carpetas", "Contrapiso", "m²", 11000),
   med("casa_desde_0", "Contrapisos y carpetas", "Carpeta de nivelación", "m²", 8500),
@@ -189,147 +189,8 @@ const SEED: FilaCatalogo[] = [
   tarea("remodelacion", "Terminaciones", "Limpieza final de obra", 50000, 90000),
 ];
 
-// ───────────────────────── Carga del catálogo ─────────────────────────
-
-export async function getCatalogo(): Promise<ItemCatalogo[]> {
-  const filas = await cargarFilas();
-  return filas.map((f, i) => ({ ...f, id: String(i) }));
-}
-
-async function cargarFilas(): Promise<FilaCatalogo[]> {
-  // TODO (paso siguiente): leer desde Neon cuando esté el panel.
-  const url = process.env.PRESUPUESTOS_SHEET_CSV;
-  if (!url) return SEED;
-  try {
-    const res = await fetch(url, { next: { revalidate: 300 } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const filas = parseCsv(await res.text());
-    return filas.length ? filas : SEED;
-  } catch (err) {
-    console.error(
-      "[presupuestos] No se pudo leer la planilla, uso el catálogo local:",
-      err
-    );
-    return SEED;
-  }
-}
-
-// ───────────────────────── Parser de CSV ─────────────────────────
-// Columnas: tipo, categoria, item, modo, unidad, precio_unitario, materiales,
-// mano_obra. (modo, materiales y mano_obra son opcionales; modo por defecto
-// "medicion".)
-
-function parseCsv(text: string): FilaCatalogo[] {
-  const rows = splitRows(text);
-  if (rows.length < 2) return [];
-
-  const header = rows[0].map((h) => h.trim().toLowerCase());
-  const col = (name: string) => header.indexOf(name);
-  const iTipo = col("tipo");
-  const iCat = col("categoria");
-  const iItem = col("item");
-  if (iTipo < 0 || iCat < 0 || iItem < 0) return [];
-  const iModo = col("modo");
-  const iUnidad = col("unidad");
-  const iPrecio = col("precio_unitario");
-  const iMat = col("materiales");
-  const iMano = col("mano_obra");
-
-  const out: FilaCatalogo[] = [];
-  for (let r = 1; r < rows.length; r++) {
-    const cols = rows[r];
-    const at = (i: number) => (i >= 0 ? cols[i] ?? "" : "");
-    const tipo = normTipo(at(iTipo));
-    const item = at(iItem).trim();
-    if (!tipo || !item) continue;
-    const modo = normModo(at(iModo));
-    out.push({
-      tipo,
-      categoria: at(iCat).trim() || "Otros",
-      item,
-      modo,
-      unidad: at(iUnidad).trim() || (modo === "tarea" ? "tarea" : "u"),
-      precioUnitario: parseNum(at(iPrecio)),
-      materiales: parseNum(at(iMat)),
-      manoObra: parseNum(at(iMano)),
-    });
-  }
-  return out;
-}
-
-function splitRows(text: string): string[][] {
-  const rows: string[][] = [];
-  let field = "";
-  let row: string[] = [];
-  let inQuotes = false;
-  const src = text.replace(/\r\n?/g, "\n");
-
-  for (let i = 0; i < src.length; i++) {
-    const ch = src[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (src[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        field += ch;
-      }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === ",") {
-      row.push(field);
-      field = "";
-    } else if (ch === "\n") {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else {
-      field += ch;
-    }
-  }
-  if (field.length > 0 || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows.filter((r) => r.some((c) => c.trim() !== ""));
-}
-
-function normTipo(raw: string): TipoPresupuesto | null {
-  const s = norm(raw);
-  if (s.startsWith("casa")) return "casa_desde_0";
-  if (s.startsWith("remod")) return "remodelacion";
-  return null;
-}
-
-function normModo(raw: string): ModoItem {
-  const s = norm(raw);
-  if (s.startsWith("tarea") || s.startsWith("partida") || s.startsWith("sector")) {
-    return "tarea";
-  }
-  return "medicion";
-}
-
-function norm(raw: string): string {
-  return (raw ?? "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-}
-
-function parseNum(raw: string): number {
-  let s = (raw ?? "").replace(/[^\d.,-]/g, "").trim();
-  if (!s) return 0;
-  // Formato es-AR: "1.234.567,89" → punto miles, coma decimal.
-  if (s.includes(".") && s.includes(",")) {
-    s = s.replace(/\./g, "").replace(",", ".");
-  } else if (s.includes(",")) {
-    s = s.replace(",", ".");
-  }
-  const n = parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
-}
+/** SEED como ItemCatalogo (con id sintético) para usar de fallback. */
+export const SEED_ITEMS: ItemCatalogo[] = SEED.map((f, i) => ({
+  ...f,
+  id: `seed-${i}`,
+}));
