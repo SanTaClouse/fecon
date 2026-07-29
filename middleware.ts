@@ -1,18 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Protege /presupuestos con una clave simple (HTTP Basic Auth). El navegador
-// pide usuario y contraseña una sola vez y las recuerda.
+// Protege las zonas privadas con una clave simple (HTTP Basic Auth). El
+// navegador pide usuario y contraseña una sola vez y las recuerda.
+//
+// Zonas privadas:
+//   /presupuestos   → generador y edición del catálogo
+//   /trabajadores   → base de gente anotada (¡datos personales!)
+//
+// El formulario público /trabaja-con-nosotros NO pasa por acá: cualquiera tiene
+// que poder anotarse desde el link del video. Ojo al tocar el matcher: la regla
+// "/trabajadores" es exacta, así que no alcanza a la ruta pública.
 //
 // Credenciales: se pueden cambiar sin tocar el código con las variables de
 // entorno PRESUPUESTOS_USER y PRESUPUESTOS_PASS (en Vercel → Settings →
 // Environment Variables). Si no están, se usan los valores por defecto.
 //
-// Excepción: los bots de "link preview" (WhatsApp, Facebook, etc.) reciben una
-// mini-página pública SOLO con los tags de OpenGraph (sin la herramienta), así
-// el link muestra preview lindo sin exponer nada ni pedir la clave a un bot.
+// Excepción: en /presupuestos, los bots de "link preview" (WhatsApp, Facebook,
+// etc.) reciben una mini-página pública SOLO con los tags de OpenGraph (sin la
+// herramienta), así el link muestra preview lindo sin exponer nada ni pedir la
+// clave a un bot. En /trabajadores no hay excepción: nunca se muestra nada.
 
 export const config = {
-  matcher: ["/presupuestos", "/presupuestos/:path*"],
+  matcher: [
+    "/presupuestos",
+    "/presupuestos/:path*",
+    "/trabajadores",
+    "/trabajadores/:path*",
+  ],
 };
 
 const BOT_RE =
@@ -58,19 +72,26 @@ export function middleware(req: NextRequest) {
     }
   }
 
+  const esPresupuestos = req.nextUrl.pathname.startsWith("/presupuestos");
+
   // Bots de preview: página pública solo con OpenGraph (sin la herramienta).
+  // Solo en /presupuestos — la base de trabajadores no se muestra ni en preview.
   const ua = req.headers.get("user-agent") || "";
-  if (BOT_RE.test(ua)) {
+  if (esPresupuestos && BOT_RE.test(ua)) {
     return new NextResponse(
       previewHtml(req.nextUrl.origin, req.nextUrl.href),
       { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }
     );
   }
 
-  return new NextResponse("Acceso restringido — FECON Presupuestos", {
+  const zona = esPresupuestos ? "Presupuestos" : "Trabajadores";
+  // Un solo realm ("FECON Privado") para las dos zonas: así el navegador pide
+  // la clave una vez sola y sirve para ambas.
+  return new NextResponse(`Acceso restringido — FECON ${zona}`, {
     status: 401,
     headers: {
-      "WWW-Authenticate": 'Basic realm="FECON Presupuestos", charset="UTF-8"',
+      "WWW-Authenticate": 'Basic realm="FECON Privado", charset="UTF-8"',
+      "x-robots-tag": "noindex, nofollow",
     },
   });
 }

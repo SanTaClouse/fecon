@@ -26,6 +26,12 @@ export function Footer() {
           >
             Instagram · @feconconstrucciones
           </a>
+          <a
+            href="/trabaja-con-nosotros"
+            className="text-blanco/[0.82] no-underline"
+          >
+            Trabajá con nosotros · Sumate al equipo
+          </a>
           <span className="text-blanco/[0.82]">
             Santa Fe capital y alrededores · Argentina
           </span>
