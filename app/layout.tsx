@@ -26,7 +26,11 @@ const mono = Space_Mono({
   display: "swap",
 });
 
-const SITE = "https://fecon.com.ar";
+// OJO: tiene que ser el dominio CANÓNICO, con www. El apex (fecon.com.ar)
+// responde 308 hacia acá, y los bots de preview —WhatsApp entre ellos— no
+// siguen el redirect cuando bajan la og:image: ven el 308 y no muestran nada.
+// De este valor salen og:url, og:image y el canonical de todas las páginas.
+const SITE = "https://www.fecon.com.ar";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
