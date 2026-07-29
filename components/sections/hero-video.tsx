@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 // hacen que Cloudinary transcodifique a H.264 comprimido; so_0 saca el primer
 // frame como poster para que haya imagen mientras descarga el video.
 const VIDEO_SRC =
-  "https://res.cloudinary.com/dlw9ocu3b/video/upload/q_auto/v1781288284/IMG_7466_cxsb98.mp4";
+  "https://res.cloudinary.com/dlw9ocu3b/video/upload/q_auto/v1785345915/IMG_9792_xdd0ng.mov";
 const POSTER_SRC =
   "https://res.cloudinary.com/dlw9ocu3b/video/upload/so_0,q_auto/v1781288284/IMG_7466_cxsb98.jpg";
 
@@ -24,7 +24,7 @@ export function HeroVideo() {
     const video = videoRef.current;
     if (!video) return;
     video.muted = true;
-    video.play().catch(() => {});
+    video.play().catch(() => { });
   }, []);
 
   const toggleSound = () => {
@@ -32,7 +32,7 @@ export function HeroVideo() {
     if (!video) return;
     const next = !muted;
     video.muted = next;
-    if (!next && video.paused) video.play().catch(() => {});
+    if (!next && video.paused) video.play().catch(() => { });
     setMuted(next);
   };
 
