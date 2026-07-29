@@ -11,9 +11,10 @@ import { NextRequest, NextResponse } from "next/server";
 // que poder anotarse desde el link del video. Ojo al tocar el matcher: la regla
 // "/trabajadores" es exacta, así que no alcanza a la ruta pública.
 //
-// Credenciales: se pueden cambiar sin tocar el código con las variables de
-// entorno PRESUPUESTOS_USER y PRESUPUESTOS_PASS (en Vercel → Settings →
-// Environment Variables). Si no están, se usan los valores por defecto.
+// Credenciales: SIEMPRE salen de las variables de entorno PRESUPUESTOS_USER y
+// PRESUPUESTOS_PASS (Vercel → Settings → Environment Variables). No hay valor
+// por defecto a propósito: el repo es público, así que una clave escrita acá
+// sería una clave publicada. Si faltan las variables, no entra nadie.
 //
 // Excepción: en /presupuestos, los bots de "link preview" (WhatsApp, Facebook,
 // etc.) reciben una mini-página pública SOLO con los tags de OpenGraph (sin la
@@ -58,8 +59,19 @@ Acceso privado — FECON Presupuestos
 }
 
 export function middleware(req: NextRequest) {
-  const USER = process.env.PRESUPUESTOS_USER || "fecon";
-  const PASS = process.env.PRESUPUESTOS_PASS || "Fecon2026";
+  const USER = process.env.PRESUPUESTOS_USER;
+  const PASS = process.env.PRESUPUESTOS_PASS;
+
+  // Sin credenciales configuradas no se entra, pero se explica por qué: es
+  // preferible quedarse afuera un minuto a dejar la puerta abierta.
+  if (!USER || !PASS) {
+    return new NextResponse(
+      "Falta configurar PRESUPUESTOS_USER y PRESUPUESTOS_PASS en las variables " +
+        "de entorno (Vercel → Settings → Environment Variables). Hasta " +
+        "entonces esta sección queda cerrada.",
+      { status: 503, headers: { "cache-control": "no-store" } }
+    );
+  }
 
   const auth = req.headers.get("authorization");
   if (auth?.startsWith("Basic ")) {

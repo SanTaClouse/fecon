@@ -36,7 +36,7 @@ export function Footer() {
             Santa Fe capital y alrededores · Argentina
           </span>
           <span className="font-mono text-[13px] text-bronce-light">
-            feconconstrucciones.com.ar
+            fecon.com.ar
           </span>
         </div>
         <div className="mt-[26px] border-t border-blanco/[0.12] pt-[18px] font-mono text-[10.5px] text-blanco/[0.4]" style={{ letterSpacing: "0.04em" }}>
