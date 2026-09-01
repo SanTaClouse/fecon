@@ -7,19 +7,22 @@ import { Testimonios } from "@/components/sections/testimonios";
 import { FAQ } from "@/components/sections/faq";
 import { CTA } from "@/components/sections/cta";
 import { Footer } from "@/components/sections/footer";
+import { ContactoProvider } from "@/components/contacto";
 
 export default function Page() {
   return (
-    <main className="bg-blanco">
-      <Nav />
-      <Hero />
-      <KPIs />
-      <Servicios />
-      <PorQue />
-      <Testimonios />
-      <FAQ />
-      <CTA />
-      <Footer />
-    </main>
+    <ContactoProvider>
+      <main className="bg-blanco">
+        <Nav />
+        <Hero />
+        <KPIs />
+        <Servicios />
+        <PorQue />
+        <Testimonios />
+        <FAQ />
+        <CTA />
+        <Footer />
+      </main>
+    </ContactoProvider>
   );
 }

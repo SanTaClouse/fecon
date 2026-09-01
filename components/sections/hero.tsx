@@ -1,5 +1,7 @@
-import { Reveal, Eyebrow, WAButton } from "@/components/ui-bits";
+import { Reveal, Eyebrow } from "@/components/ui-bits";
+import { WAButton } from "@/components/contacto";
 import { HeroVideo } from "@/components/sections/hero-video";
+import { ArrowRight } from "@/components/marks";
 
 // Video de fondo (reel vertical) con overlay gradiente para legibilidad.
 export function Hero() {
@@ -27,16 +29,29 @@ export function Hero() {
             cero a llaves, o el techo que tu casa necesita.
           </p>
         </Reveal>
-        <Reveal
-          delay={220}
-          className="mt-[30px] flex flex-wrap items-center gap-[18px]"
-        >
-          <WAButton big>Pedir presupuesto</WAButton>
+        <Reveal delay={220} className="mt-[30px]">
+          <div className="flex flex-wrap items-center gap-[18px]">
+            <WAButton big>Pedir presupuesto</WAButton>
+            <a
+              href="#servicios"
+              className="border-b-[1.5px] border-bronce pb-[2px] font-sans text-[15px] font-semibold text-blanco no-underline"
+            >
+              Ver servicios
+            </a>
+          </div>
+
+          {/* Puerta de entrada para la gente que llega del reel buscando
+              trabajo: bien visible arriba de todo, para que no termine
+              escribiendo al WhatsApp de ventas. */}
           <a
-            href="#servicios"
-            className="border-b-[1.5px] border-bronce pb-[2px] font-sans text-[15px] font-semibold text-blanco no-underline"
+            href="/trabaja-con-nosotros"
+            className="mt-[18px] inline-flex items-center gap-[10px] rounded-full border border-blanco/[0.35] bg-grafito-900/[0.45] px-[18px] py-[12px] font-sans text-[15px] font-semibold text-blanco no-underline backdrop-blur-[8px] transition-transform active:scale-[0.98]"
           >
-            Ver servicios
+            <span className="h-[7px] w-[7px] rounded-full bg-bronce-light" />
+            <span>
+              <b className="font-bold">¿Buscás trabajo?</b> Anotate acá
+            </span>
+            <ArrowRight />
           </a>
         </Reveal>
       </div>

@@ -1,19 +1,19 @@
 import { Reveal, Eyebrow } from "@/components/ui-bits";
 import { IconTecho, ArrowRight } from "@/components/marks";
-import { WA } from "@/lib/whatsapp";
+import { ContactoTrigger } from "@/components/contacto";
 
 const cards = [
   {
     n: "01",
     t: "Construcción llave en mano",
     d: "Nos hacemos cargo de todo el proceso de construcción.",
-    href: WA.construccion,
+    ctx: "construccion" as const,
   },
   {
     n: "02",
     t: "Remodelaciones integrales",
     d: "Ampliar, renovar o transformar lo que ya tenés, con el mismo equipo de principio a fin.",
-    href: WA.remodelacion,
+    ctx: "remodelacion" as const,
   },
 ];
 
@@ -39,11 +39,10 @@ export function Servicios() {
         <div className="flex flex-col gap-[14px]">
           {cards.map((c, i) => (
             <Reveal key={c.n} delay={i * 80}>
-              <a
-                href={c.href}
-                target="_blank"
-                rel="noopener"
-                className="block rounded-2xl bg-lino-2 px-[22px] py-[24px] no-underline"
+              <ContactoTrigger
+                contexto={c.ctx}
+                aria-label={`Consultar por ${c.t}`}
+                className="block rounded-2xl bg-lino-2 px-[22px] py-[24px]"
               >
                 <div className="mb-[14px] font-mono text-[12px] text-bronce">
                   {c.n}
@@ -57,17 +56,16 @@ export function Servicios() {
                 <p className="mt-[10px] font-sans text-[15px] leading-[1.5] text-muted">
                   {c.d}
                 </p>
-              </a>
+              </ContactoTrigger>
             </Reveal>
           ))}
 
           {/* Destacado: techos de tejas */}
           <Reveal delay={160}>
-            <a
-              href={WA.techo}
-              target="_blank"
-              rel="noopener"
-              className="relative block overflow-hidden rounded-2xl bg-grafito px-[22px] py-[26px] no-underline"
+            <ContactoTrigger
+              contexto="techo"
+              aria-label="Consultar por mi techo"
+              className="relative block overflow-hidden rounded-2xl bg-grafito px-[22px] py-[26px]"
             >
               <div className="absolute right-[20px] top-[20px]">
                 <IconTecho c="#FAF6EE" a="#A2823F" />
@@ -90,7 +88,7 @@ export function Servicios() {
               <span className="inline-flex items-center gap-[7px] font-sans text-[14.5px] font-bold text-bronce-light">
                 Consultar por mi techo <ArrowRight />
               </span>
-            </a>
+            </ContactoTrigger>
           </Reveal>
         </div>
       </div>

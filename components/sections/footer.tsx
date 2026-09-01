@@ -1,5 +1,5 @@
 import { ModuloF, Wordmark } from "@/components/marks";
-import { WA, WA_DISPLAY } from "@/lib/whatsapp";
+import { ContactoTrigger } from "@/components/contacto";
 
 export function Footer() {
   return (
@@ -10,14 +10,9 @@ export function Footer() {
           <Wordmark size={22} />
         </div>
         <div className="flex flex-col gap-[12px] font-sans text-[15px]">
-          <a
-            href={WA.general}
-            target="_blank"
-            rel="noopener"
-            className="text-blanco/[0.82] no-underline"
-          >
-            WhatsApp · {WA_DISPLAY}
-          </a>
+          <ContactoTrigger className="font-sans text-[15px] text-blanco/[0.82]">
+            WhatsApp · Presupuestos y obras
+          </ContactoTrigger>
           <a
             href="https://instagram.com/feconconstrucciones"
             target="_blank"
@@ -28,7 +23,7 @@ export function Footer() {
           </a>
           <a
             href="/trabaja-con-nosotros"
-            className="text-blanco/[0.82] no-underline"
+            className="font-semibold text-bronce-light no-underline"
           >
             Trabajá con nosotros · Sumate al equipo
           </a>

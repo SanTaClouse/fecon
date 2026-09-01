@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { ModuloF, Wordmark } from "@/components/marks";
-import { WA } from "@/lib/whatsapp";
+import { useContacto } from "@/components/contacto";
 import { cn } from "@/lib/utils";
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false);
+  const { abrir } = useContacto();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -29,15 +30,14 @@ export function Nav() {
           <ModuloF size={22} />
           <Wordmark size={18} />
         </div>
-        <a
-          href={WA.general}
-          target="_blank"
-          rel="noopener"
-          aria-label="Pedir presupuesto por WhatsApp"
-          className="rounded-full border border-blanco/[0.35] px-[15px] py-[8px] font-sans text-[13.5px] font-bold text-blanco no-underline"
+        <button
+          type="button"
+          onClick={() => abrir()}
+          aria-label="Pedir presupuesto"
+          className="rounded-full border border-blanco/[0.35] px-[15px] py-[8px] font-sans text-[13.5px] font-bold text-blanco"
         >
           Presupuesto
-        </a>
+        </button>
       </div>
     </header>
   );
